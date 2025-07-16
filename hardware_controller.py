@@ -4,12 +4,6 @@ import time
 import numpy as np
 import os
 
-# --- 이 섹션은 라즈베리파이에서 사용됩니다 ---
-# 라즈베리파이에 배포할 때 아래 줄의 주석을 해제하세요.
-# import RPi.GPIO as GPIO
-# from picamera2 import Picamera2, Preview
-# ---------------------------------------------------------
-
 
 class BaseController:
     """
@@ -115,6 +109,20 @@ class RaspberryPiController(BaseController):
     """
 
     def __init__(self):
+        # --- 라즈베리파이 전용 라이브러리 임포트 ---
+        # 이 컨트롤러는 라즈베리파이에서만 인스턴스화되어야 합니다.
+        try:
+            import RPi.GPIO as GPIO
+            from picamera2 import Picamera2
+        except (ImportError, RuntimeError) as e:
+            print(f"오류: 라즈베리파이 라이브러리를 임포트할 수 없습니다. {e}")
+            print("프로그램이 Mock 모드가 아닌 라즈베리파이에서 실행되고 있는지 확인하세요.")
+            raise
+
+        self.GPIO = GPIO
+        self.Picamera2 = Picamera2
+        # -----------------------------------------
+
         # 제공된 문서 기반 GPIO 핀 매핑 (BCM 모드 기준)
         self.LED_PIN = 12  # 거실 조명 (물리적 핀 32)
         self.BTN_PIN = 25  # 초인종 버튼 (물리적 핀 22)
@@ -135,32 +143,32 @@ class RaspberryPiController(BaseController):
 
     def setup(self):
         print("🔧 라즈베리파이 설정: GPIO 핀 구성 중...")
-        GPIO.setmode(GPIO.BCM)
-        GPIO.setwarnings(False)
+        self.GPIO.setmode(self.GPIO.BCM)
+        self.GPIO.setwarnings(False)
 
         # 거실 조명 & 밝기 조절 조명 (핀 공유)
-        GPIO.setup(self.LED_PIN, GPIO.OUT)
-        self.pwm_led = GPIO.PWM(self.LED_PIN, 500)  # 500 Hz 주파수
+        self.GPIO.setup(self.LED_PIN, self.GPIO.OUT)
+        self.pwm_led = self.GPIO.PWM(self.LED_PIN, 500)  # 500 Hz 주파수
         self.pwm_led.start(0)  # 꺼진 상태에서 시작
 
         # RGB 무드 램프
-        GPIO.setup([self.R_PIN, self.G_PIN, self.B_PIN], GPIO.OUT)
-        self.pwm_r = GPIO.PWM(self.R_PIN, 100)
-        self.pwm_g = GPIO.PWM(self.G_PIN, 100)
-        self.pwm_b = GPIO.PWM(self.B_PIN, 100)
+        self.GPIO.setup([self.R_PIN, self.G_PIN, self.B_PIN], self.GPIO.OUT)
+        self.pwm_r = self.GPIO.PWM(self.R_PIN, 100)
+        self.pwm_g = self.GPIO.PWM(self.G_PIN, 100)
+        self.pwm_b = self.GPIO.PWM(self.B_PIN, 100)
         self.pwm_r.start(0)
         self.pwm_g.start(0)
         self.pwm_b.start(0)
 
         # 초인종 버튼
-        GPIO.setup(self.BTN_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+        self.GPIO.setup(self.BTN_PIN, self.GPIO.IN, pull_up_down=self.GPIO.PUD_UP)
 
         # 초음파 센서
-        GPIO.setup(self.TRIG_PIN, GPIO.OUT)
-        GPIO.setup(self.ECHO_PIN, GPIO.IN)
+        self.GPIO.setup(self.TRIG_PIN, self.GPIO.OUT)
+        self.GPIO.setup(self.ECHO_PIN, self.GPIO.IN)
 
         # 파이 카메라
-        self.picam2 = Picamera2()
+        self.picam2 = self.Picamera2()
         config = self.picam2.create_still_configuration()
         self.picam2.configure(config)
         self.picam2.start()
@@ -187,20 +195,20 @@ class RaspberryPiController(BaseController):
 
     def read_doorbell(self):
         # PUD_UP 설정으로 인해 버튼이 눌리면 GPIO 핀이 LOW 상태가 됨
-        return GPIO.input(self.BTN_PIN) == GPIO.LOW
+        return self.GPIO.input(self.BTN_PIN) == self.GPIO.LOW
 
     def get_distance(self):
-        GPIO.output(self.TRIG_PIN, False)
+        self.GPIO.output(self.TRIG_PIN, False)
         time.sleep(0.5)
 
-        GPIO.output(self.TRIG_PIN, True)
+        self.GPIO.output(self.TRIG_PIN, True)
         time.sleep(0.00001)
-        GPIO.output(self.TRIG_PIN, False)
+        self.GPIO.output(self.TRIG_PIN, False)
 
-        while GPIO.input(self.ECHO_PIN) == 0:
+        while self.GPIO.input(self.ECHO_PIN) == 0:
             pulse_start = time.time()
 
-        while GPIO.input(self.ECHO_PIN) == 1:
+        while self.GPIO.input(self.ECHO_PIN) == 1:
             pulse_end = time.time()
 
         pulse_duration = pulse_end - pulse_start
@@ -218,6 +226,6 @@ class RaspberryPiController(BaseController):
         self.pwm_r.stop()
         self.pwm_g.stop()
         self.pwm_b.stop()
-        GPIO.cleanup()
+        self.GPIO.cleanup()
         self.picam2.stop()
         print("✅ 정리 완료.")
