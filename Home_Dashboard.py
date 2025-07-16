@@ -61,16 +61,6 @@ col1, col2 = st.columns(2)
 with col1:
     st.header("💡 Lighting")
 
-    # Living Room Light (Represented by a single LED)
-    with st.container(border=True):
-        st.subheader("Living Room Light")
-        # The 'room_light_toggle' key stores the state of the widget.
-        is_on = st.toggle("On/Off", key="room_light_toggle")
-        hw.set_room_light(is_on)
-        if isinstance(hw, MockController):
-            st.info("This corresponds to a single LED controlled by a GPIO pin.")
-
-    # Dimmable Light (Represented by a PWM-controlled LED)
     with st.container(border=True):
         st.subheader("Bedroom Light")
         brightness = st.slider("Brightness", min_value=0, max_value=100, value=100, step=1, key="dimmable_light_slider")
