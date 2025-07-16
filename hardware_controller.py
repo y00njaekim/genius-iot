@@ -48,49 +48,49 @@ class MockController(BaseController):
         self._dimmable_light_brightness = 100
         self._mood_lamp_color = (255, 255, 255)
         self._doorbell_pressed = False
-        print("✅ Mock 하드웨어 컨트롤러가 초기화되었습니다.")
+        print("✅ Mock hardware controller initialized.")
 
     def setup(self):
-        print("🔧 Mock 설정: 하드웨어가 시뮬레이션되므로 별도 작업 없음.")
+        print("🔧 Mock setup: No action needed as hardware is simulated.")
         pass
 
     def set_room_light(self, state):
         self._room_light_state = state
         status = "ON" if state else "OFF"
-        print(f"💡 Mock 거실 조명 -> {status}")
+        print(f"💡 Mock Room Light -> {status}")
 
     def set_dimmable_light(self, brightness):
         self._dimmable_light_brightness = brightness
-        print(f"💡 Mock 밝기 조절 조명 -> 밝기 {brightness}%")
+        print(f"💡 Mock Dimmable Light -> Brightness {brightness}%")
 
     def set_mood_lamp_color(self, r, g, b):
         self._mood_lamp_color = (r, g, b)
-        print(f"🎨 Mock 무드 램프 -> 색상 ({r}, {g}, {b})")
+        print(f"🎨 Mock Mood Lamp -> Color ({r}, {g}, {b})")
 
     def read_doorbell(self):
-        # 실제 시나리오에서는 핀을 읽지만, 여기서는 시뮬레이션합니다.
-        # 웹 UI의 버튼으로 이 상태를 토글할 수 있습니다.
+        # In a real scenario, this would read a pin. We simulate it here.
+        # A button in the web UI can toggle this state.
         return self._doorbell_pressed
 
     def get_distance(self):
-        # 약간의 노이즈를 포함하여 거리 센서를 시뮬레이션합니다.
+        # Simulate the distance sensor with some noise
         base_distance = 80
         noise = np.random.uniform(-1.5, 1.5)
         return round(base_distance + noise, 1)
 
     def capture_image(self, output_path):
-        # 플레이스홀더 이미지 경로를 반환합니다.
+        # Return a placeholder image path.
         placeholder_path = os.path.join("assets", "placeholder.jpg")
         if os.path.exists(placeholder_path):
-            # 실제 앱에서는 이 파일을 output_path로 복사해야 합니다.
-            print(f"📸 Mock 카메라 -> {placeholder_path}의 플레이스홀더 사용")
+            # In a real app, this should copy the file to output_path
+            print(f"📸 Mock Camera -> Using placeholder at {placeholder_path}")
             return placeholder_path
         else:
-            print("오류: assets/placeholder.jpg 에서 플레이스홀더 이미지를 찾을 수 없습니다.")
+            print("Error: Placeholder image not found at assets/placeholder.jpg.")
             return None
 
     def cleanup(self):
-        print("🧹 Mock 정리: 별도 작업 없음.")
+        print("🧹 Mock cleanup: No action needed.")
         pass
 
 
@@ -115,8 +115,8 @@ class RaspberryPiController(BaseController):
             import RPi.GPIO as GPIO
             from picamera2 import Picamera2
         except (ImportError, RuntimeError) as e:
-            print(f"오류: 라즈베리파이 라이브러리를 임포트할 수 없습니다. {e}")
-            print("프로그램이 Mock 모드가 아닌 라즈베리파이에서 실행되고 있는지 확인하세요.")
+            print(f"Error: Could not import Raspberry Pi libraries. {e}")
+            print("Please ensure this program is running on a Raspberry Pi and not in Mock mode.")
             raise
 
         self.GPIO = GPIO
@@ -139,10 +139,10 @@ class RaspberryPiController(BaseController):
         self.pwm_b = None
 
         self.picam2 = None
-        print("✅ 라즈베리파이 하드웨어 컨트롤러가 초기화되었습니다.")
+        print("✅ Raspberry Pi hardware controller initialized.")
 
     def setup(self):
-        print("🔧 라즈베리파이 설정: GPIO 핀 구성 중...")
+        print("🔧 Raspberry Pi Setup: Configuring GPIO pins...")
         self.GPIO.setmode(self.GPIO.BCM)
         self.GPIO.setwarnings(False)
 
@@ -168,33 +168,45 @@ class RaspberryPiController(BaseController):
         self.GPIO.setup(self.ECHO_PIN, self.GPIO.IN)
 
         # 파이 카메라
-        self.picam2 = self.Picamera2()
-        config = self.picam2.create_still_configuration()
-        self.picam2.configure(config)
-        self.picam2.start()
-        time.sleep(1)  # 카메라 예열 시간
-        print("✅ GPIO 및 카메라 설정 완료.")
+        try:
+            print("📷 Attempting to initialize camera...")
+            self.picam2 = self.Picamera2()
+            config = self.picam2.create_still_configuration()
+            self.picam2.configure(config)
+            self.picam2.start()
+            time.sleep(1)  # Allow camera to warm up
+            if self.picam2.started:
+                print("✅ Camera started successfully.")
+            else:
+                print("⚠️ Camera failed to start, but no exception was raised. The button might not be displayed in the UI.")
+                self.picam2 = None  # Explicitly set to None for UI checks
+        except Exception as e:
+            print(f"❌ Critical error during camera setup: {e}")
+            print("    Please ensure the camera is connected and enabled correctly.")
+            self.picam2 = None  # Explicitly set to None for UI checks
+
+        print("✅ GPIO setup complete.")
 
     def set_room_light(self, state):
-        # 단순 켜고 끄기를 위해 듀티 사이클을 100% 또는 0%로 설정
+        # Set duty cycle to 100% or 0% for simple on/off
         brightness = 100 if state else 0
         self.pwm_led.ChangeDutyCycle(brightness)
         status = "ON" if state else "OFF"
-        print(f"💡 거실 조명 -> {status}")
+        print(f"💡 Room Light -> {status}")
 
     def set_dimmable_light(self, brightness):
         self.pwm_led.ChangeDutyCycle(brightness)
-        print(f"💡 밝기 조절 조명 -> 밝기 {brightness}%")
+        print(f"💡 Dimmable Light -> Brightness {brightness}%")
 
     def set_mood_lamp_color(self, r, g, b):
-        # 0-255 색상 값을 0-100 듀티 사이클로 변환
+        # Convert 0-255 color values to 0-100 duty cycle
         self.pwm_r.ChangeDutyCycle(r / 255.0 * 100)
         self.pwm_g.ChangeDutyCycle(g / 255.0 * 100)
         self.pwm_b.ChangeDutyCycle(b / 255.0 * 100)
-        print(f"🎨 무드 램프 -> 색상 ({r}, {g}, {b})")
+        print(f"🎨 Mood Lamp -> Color ({r}, {g}, {b})")
 
     def read_doorbell(self):
-        # PUD_UP 설정으로 인해 버튼이 눌리면 GPIO 핀이 LOW 상태가 됨
+        # Button press pulls the GPIO pin to LOW due to PUD_UP
         return self.GPIO.input(self.BTN_PIN) == self.GPIO.LOW
 
     def get_distance(self):
@@ -212,20 +224,24 @@ class RaspberryPiController(BaseController):
             pulse_end = time.time()
 
         pulse_duration = pulse_end - pulse_start
-        distance = pulse_duration * 17150  # 음속 (34300 cm/s) / 2
+        distance = pulse_duration * 17150  # Speed of sound (34300 cm/s) / 2
         return round(distance, 2)
 
     def capture_image(self, output_path):
-        self.picam2.capture_file(output_path)
-        print(f"📸 카메라 -> 이미지가 {output_path}에 저장됨")
-        return output_path
+        try:
+            self.picam2.capture_file(output_path)
+            print(f"📸 Camera -> Image saved to {output_path}")
+            return output_path
+        except Exception as e:
+            print(f"❌ Camera Error: Failed to capture image. Error: {e}")
+            return None
 
     def cleanup(self):
-        print("🧹 GPIO 핀 정리 중...")
+        print("🧹 Cleaning up GPIO pins...")
         self.pwm_led.stop()
         self.pwm_r.stop()
         self.pwm_g.stop()
         self.pwm_b.stop()
         self.GPIO.cleanup()
         self.picam2.stop()
-        print("✅ 정리 완료.")
+        print("✅ Cleanup complete.")

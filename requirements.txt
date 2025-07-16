@@ -1,5 +1,4 @@
 streamlit
-numpy # Mock 센서가 데이터를 생성하는 데 사용됩니다. 
+numpy
 RPi.GPIO
 picamera2
-numpy
